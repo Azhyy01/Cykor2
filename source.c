@@ -100,7 +100,7 @@ int cd(char* path) {
 
 
 
-	else (chdir(path) != 0); {
+	if (chdir(path) != 0) {
 		perror("cd");
 		return -1;
 	}
