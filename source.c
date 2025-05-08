@@ -15,7 +15,7 @@
 #define PATH_MAX 1024
 #define TOKEN_CNT 64
 
-void print_prompt() {    //ÀÎÅÍÆäÀÌ½º ±¸Çö
+void print_prompt() {    //ì¸í„°í˜ì´ìŠ¤ êµ¬í˜„
 	char hostname[HOST_NAME_MAX];
 	char cwd[PATH_MAX];
 	char* username;
@@ -28,7 +28,7 @@ void print_prompt() {    //ÀÎÅÍÆäÀÌ½º ±¸Çö
 
 
 }
-char** tokenize(char* line , int* token_count) //ÀÔ·ÂÇÑ ¹®ÀÚ¿­À» °ø¹é´ÜÀ§·Î ³ª´² ÅäÅ«È­ ÇÑ ÈÄ returnÇÏ´Â ÇÔ¼ö -> ÀÌ·¯¸é ÀÔ·ÂÀ» ¹è¿­·Î ¹Ş¾Æ¾ß ÇÔ.
+char** tokenize(char* line , int* token_count) //ì…ë ¥í•œ ë¬¸ìì—´ì„ ê³µë°±ë‹¨ìœ„ë¡œ ë‚˜ëˆ  í† í°í™” í•œ í›„ returní•˜ëŠ” í•¨ìˆ˜ -> ì´ëŸ¬ë©´ ì…ë ¥ì„ ë°°ì—´ë¡œ ë°›ì•„ì•¼ í•¨.
 {
 	
 	char** tokens = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
@@ -55,11 +55,6 @@ char** tokenize(char* line , int* token_count) //ÀÔ·ÂÇÑ ¹®ÀÚ¿­À» °ø¹é´ÜÀ§·Î ³ª´²
 	return tokens;
 }
 
-
-
-
-
-
 void pwd(void)
 {
 
@@ -74,19 +69,43 @@ void pwd(void)
 	}
 }
 int cd(char* path) {
-	if (path == NULL || strcmp(path, "") == 0) {
+	static char prev_cwd[PATH_MAX] = "";
+	char curr_path[PATH_MAX];
+	// í˜„ì¬ ê²½ë¡œ ì €ì¥
+	if (getcwd(curr_path, sizeof(curr_path)) == NULL) {
+		perror("getcwd");
+		return -1;
+	}
+
+	
+	if (path == NULL || strcmp(path, "") == 0 || strcmp(path, "~") == 0) {  //cd, cd ~ -> í™ˆ ë””ë ‰í† ë¦¬ë¡œ ì´ë™í•˜ëŠ” ëª…ë ¹ì–´ êµ¬í˜„
 		path = getenv("HOME");
 		if (path == NULL) {
 			fprintf(stderr, "cd: HOME not set\n");
 			return -1;
 		}
 	}
+	//cd - êµ¬í˜„
+	else if (strcmp(path, "-") == 0)
+	{
 
-	if (chdir(path) != 0) {
+		if (strlen(prev_cwd) == 0)
+		{
+			fprintf(stderr, "cd: OLDPWD not set\n");
+			return -1;
+		}
+		path = prev_cwd;
+		printf("%s\n", path);
+	}
+
+
+
+	else (chdir(path) != 0); {
 		perror("cd");
 		return -1;
 	}
 
+	strcpy(prev_cwd, curr_path); //ë‹¤ìŒ cdí˜¸ì¶œ ë•ŒëŠ” curr_pathê°€ ì´ì „ ê²½ë¡œê°€ ë˜ê¸° ë•Œë¬¸ì— ê°±ì‹ 
 	return 0;
 }
 
@@ -115,7 +134,7 @@ void pipee(char** token, int token_count, char* line) {
 	}
 	node_token[node][mi_token] = NULL;
 
-	// Ã¹ ¹øÂ° ¸í·É¾î
+	// ì²« ë²ˆì§¸ ëª…ë ¹ì–´
 	if (strcmp(node_token[0][0], "cd") == 0 || strcmp(node_token[0][0], "pwd") == 0) {
 		if (strcmp(node_token[0][0], "cd") == 0) {
 			if (node_token[0][1] == NULL) {
@@ -148,7 +167,7 @@ void pipee(char** token, int token_count, char* line) {
 		close(pipes[0][1]);
 		wait(&status);
 
-		// Áß°£ ¸í·É¾î Ã³¸®
+		// ì¤‘ê°„ ëª…ë ¹ì–´ ì²˜ë¦¬
 		for (int i = 0; i < node - 1; i++) {
 			if (strcmp(node_token[i + 1][0], "cd") == 0 || strcmp(node_token[i + 1][0], "pwd") == 0) {
 				if (strcmp(node_token[i + 1][0], "cd") == 0) {
@@ -185,7 +204,7 @@ void pipee(char** token, int token_count, char* line) {
 			wait(&status);
 		}
 
-		// ¸¶Áö¸· ¸í·É¾î Ã³¸®
+		// ë§ˆì§€ë§‰ ëª…ë ¹ì–´ ì²˜ë¦¬
 		if (strcmp(node_token[node][0], "cd") == 0 || strcmp(node_token[node][0], "pwd") == 0) {
 			if (strcmp(node_token[node][0], "cd") == 0) {
 				if (node_token[node][1] == NULL) {
@@ -217,7 +236,7 @@ void pipee(char** token, int token_count, char* line) {
 		wait(&status);
 	}
 
-	// ¸Ş¸ğ¸® ÇØÁ¦
+	// ë©”ëª¨ë¦¬ í•´ì œ
 	for (int i = 0; i <= node; i++) {
 		free(node_token[i]);
 	}
@@ -232,7 +251,7 @@ void execc(char* line) {
 	char** tokens = tokenize(line, &token_count);
 	int pid;
 
-	// ÆÄÀÌÇÁ ±âÈ£ Å½»ö
+	// íŒŒì´í”„ ê¸°í˜¸ íƒìƒ‰
 	for (int i = 0; line[i] != '\0'; i++) {
 		if (line[i] == '|') {
 			pipp = 1;
@@ -244,7 +263,7 @@ void execc(char* line) {
 		pipee(tokens, token_count, line);
 	}
 	else {
-		// ³»ºÎ ¸í·É¾î Ã³¸®
+		// ë‚´ë¶€ ëª…ë ¹ì–´ ì²˜ë¦¬
 		if (strcmp(tokens[0], "cd") == 0 || strcmp(tokens[0], "pwd") == 0) {
 			if (strcmp(tokens[0], "cd") == 0) {
 				if (token_count == 1) {
@@ -264,12 +283,12 @@ void execc(char* line) {
 		else {
 			pid = fork();
 			if (pid < 0) {
-				perror("fork ½ÇÆĞ");
+				perror("fork ì‹¤íŒ¨");
 				return;
 			}
 			else if (pid == 0) {
 				execvp(tokens[0], tokens);
-				perror("execvp ½ÇÆĞ");
+				perror("execvp ì‹¤íŒ¨");
 				exit(1);
 			}
 			else {
@@ -294,6 +313,7 @@ int main(int argc, char* argv[])
 	char line[MAX_INPUT_SIZE];
 
 	while (1) {
+		
 		print_prompt();
 	
 		char* result = fgets(line, sizeof(line), stdin);  
@@ -304,7 +324,7 @@ int main(int argc, char* argv[])
 		if (strlen(line) == 0) continue;
 		if (strcmp(line, "exit") == 0) break;
 		execc(line);
-		printf("\n");
+		
 
 	}
 	
