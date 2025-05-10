@@ -5,7 +5,7 @@
 #include<stdlib.h>
 #include<sys/types.h>
 #include<sys/wait.h>
-
+#include<signal.h>
 
 
 
@@ -14,7 +14,7 @@
 #define HOST_NAME_MAX 64
 #define PATH_MAX 1024
 #define TOKEN_CNT 64
-
+int job_num = 0; // &명령어 실행시 출력될 job_number
 void print_prompt() {    //인터페이스 구현
 	char hostname[HOST_NAME_MAX];
 	char cwd[PATH_MAX];
@@ -107,6 +107,157 @@ int cd(char* path) {
 
 	strcpy(prev_cwd, curr_path); //다음 cd호출 때는 curr_path가 이전 경로가 되기 때문에 갱신
 	return 0;
+}
+
+void multi1 (char* line, char** token, int token_count) { // 다중 명령어 ; 처리
+	char** node_token[MAX_TOKEN_SIZE];
+	int node = 0; 
+	int mi_token = 0;
+	int pid = 0;  //fork() 사용 위함
+	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+	for (int i = 0; token[i] != NULL; i++) {
+		if (strcmp(token[i], ";") == 0) {
+			node_token[node][mi_token] = NULL;
+			node++;
+			mi_token = 0;
+			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+		}
+		else {
+			node_token[node][mi_token++] = token[i];
+		}
+	}
+	node_token[node][mi_token] = NULL;
+	for (int i = 0; i <= node; i++)
+	{
+		pid = fork();   //부모 프로세스를 자식 프로세스로 대체해야 반복문 계속 진행
+		if (pid == 0) {
+			execvp(node_token[i][0], node_token[i]);
+			perror("execvp fail");
+			exit(1);
+		}
+		else {
+			wait(NULL);
+		}
+
+	}
+
+	for (int i = 0; i <= node; i++) {
+		free(node_token[i]);
+	}
+	return;
+}
+
+void multi2(char* line, char** token, int token_count) {  //다중명령어 && 처리
+	char** node_token[MAX_TOKEN_SIZE];
+	int node = 0, mi_token = 0;
+	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+
+	for (int i = 0; token[i] != NULL; i++) {
+		if (strcmp(token[i], "&&") == 0) {
+			node_token[node][mi_token] = NULL;
+			node++;
+			mi_token = 0;
+			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+		}
+		else {
+			node_token[node][mi_token++] = token[i];
+		}
+	}
+	node_token[node][mi_token] = NULL;
+
+	for (int i = 0; i <= node; i++) {
+		int pid = fork();
+		if (pid == 0) {
+			execvp(node_token[i][0], node_token[i]);
+			perror("execvp fail");
+			exit(1);
+		}
+		else {
+			int status;
+			waitpid(pid, &status, 0);
+			// 앞 명령이 실패하면 다음 명령어는 실행 안 함
+			if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) //부모가 자식의 종료상태 체크
+				break;
+		}
+	}
+
+	for (int i = 0; i <= node; i++)
+		free(node_token[i]);
+}
+
+void multi3(char* line, char** token, int token_count) { //다중 명령어 || 처리
+	char** node_token[MAX_TOKEN_SIZE];
+	int node = 0, mi_token = 0;
+	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+
+	for (int i = 0; token[i] != NULL; i++) {
+		if (strcmp(token[i], "||") == 0) {
+			node_token[node][mi_token] = NULL;
+			node++;
+			mi_token = 0;
+			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+		}
+		else {
+			node_token[node][mi_token++] = token[i];
+		}
+	}
+	node_token[node][mi_token] = NULL;
+
+	for (int i = 0; i <= node; i++) {
+		int pid = fork();
+		if (pid == 0) {
+			execvp(node_token[i][0], node_token[i]);
+			perror("execvp fail");
+			exit(1);
+		}
+		else {
+			int status;
+			waitpid(pid, &status, 0);
+			// 앞 명령이 성공하면 다음 명령어는 실행 안 함
+			if (!WIFEXITED(status) || WEXITSTATUS(status) == 0)
+				break;
+		}
+	}
+
+	for (int i = 0; i <= node; i++)
+		free(node_token[i]);
+}
+
+void multi4(char* line, char** token, int token_count) {  //다중명령어 & 처리
+	char** node_token[MAX_TOKEN_SIZE];
+	
+	int node = 0;
+	int mi_token = 0;
+	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+	for (int i = 0; token[i] != NULL; i++) {
+		if (strcmp(token[i], "&") == 0) {
+			node_token[node][mi_token] = NULL;
+			node++;
+			mi_token = 0;
+			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+		}
+		else {
+			node_token[node][mi_token++] = token[i];
+		}
+	}
+	node_token[node][mi_token] = NULL;
+	for (int i = 0; i <= node; i++)
+	{
+		int pid = fork();
+		if (pid == 0)
+		{
+			
+
+			execvp(node_token[i][0], node_token[i]);
+			perror("excvp fail");
+			exit(1);
+		}
+
+	}
+	for (int i = 0; i <= node; i++) {
+		free(node_token[i]);
+	}
+	return;
 }
 
 
@@ -250,6 +401,32 @@ void execc(char* line) {
 	int pipp = 0;
 	char** tokens = tokenize(line, &token_count);
 	int pid;
+	//다중 명령어 기호 탐색
+	for (int i = 0; line[i] != '\0'; i++)
+	{
+		if (line[i] == '&' && line[i + 1] == '&') {
+			multi2(line, tokens, token_count);
+			return;
+		}
+		else if (line[i] == '|' && line[i + 1] == '|') {
+			multi3(line, tokens, token_count);
+			return;
+		}
+		else if (line[i] == ';')
+		{
+			multi1(line, tokens, token_count);
+			return;
+		}
+		else if (line[i] == '&')
+		{
+			multi4(line, tokens, token_count);
+			
+			
+			return;
+		}
+	}
+	
+	
 
 	// 파이프 기호 탐색
 	for (int i = 0; line[i] != '\0'; i++) {
@@ -283,12 +460,12 @@ void execc(char* line) {
 		else {
 			pid = fork();
 			if (pid < 0) {
-				perror("fork 실패");
+				perror("fork fail");
 				return;
 			}
 			else if (pid == 0) {
 				execvp(tokens[0], tokens);
-				perror("execvp 실패");
+				perror("execvp fail");
 				exit(1);
 			}
 			else {
@@ -310,6 +487,8 @@ void execc(char* line) {
 
 int main(int argc, char* argv[])
 {
+	
+
 	char line[MAX_INPUT_SIZE];
 
 	while (1) {
@@ -322,7 +501,7 @@ int main(int argc, char* argv[])
 		}
 		line[strcspn(line, "\n")] = '\0';
 		if (strlen(line) == 0) continue;
-		if (strcmp(line, "exit") == 0) break;
+		if (strcmp(line, "exit") == 0) break; //exit 기능 구현
 		execc(line);
 		
 
