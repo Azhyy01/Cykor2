@@ -109,155 +109,131 @@ int cd(char* path) {
 	return 0;
 }
 
-void multi1 (char* line, char** token, int token_count) { // 다중 명령어 ; 처리
-	char** node_token[MAX_TOKEN_SIZE];
-	int node = 0; 
-	int mi_token = 0;
-	int pid = 0;  //fork() 사용 위함
-	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
-	for (int i = 0; token[i] != NULL; i++) {
-		if (strcmp(token[i], ";") == 0) {
-			node_token[node][mi_token] = NULL;
-			node++;
-			mi_token = 0;
-			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
-		}
-		else {
-			node_token[node][mi_token++] = token[i];
-		}
-	}
-	node_token[node][mi_token] = NULL;
-	for (int i = 0; i <= node; i++)
-	{
-		pid = fork();   //부모 프로세스를 자식 프로세스로 대체해야 반복문 계속 진행
+
+void multi1(char** line, int line_index) { // 다중 명령어 ; 처리
+	for (int i = 0; i < line_index; i++) {
+		int token_count = 0;
+		char** tokens = tokenize(line[i], &token_count); // 명령어 하나씩 토큰화
+
+		pid_t pid = fork();
 		if (pid == 0) {
-			execvp(node_token[i][0], node_token[i]);
-			perror("execvp fail");
+			// 자식 프로세스
+			execvp(tokens[0], tokens);
+			fprintf(stderr, "KU Shell: %s: command not found\n", tokens[0]);
 			exit(1);
 		}
-		else {
+		else if (pid > 0) {
+			// 부모 프로세스
 			wait(NULL);
 		}
+		else {
+			perror("fork failed");
+		}
 
+		// 메모리 정리 (strdup 사용 시)
+		for (int j = 0; j < token_count; j++) {
+			free(tokens[j]);
+		}
+		free(tokens);
 	}
-
-	for (int i = 0; i <= node; i++) {
-		free(node_token[i]);
-	}
-	return;
 }
 
-void multi2(char* line, char** token, int token_count) {  //다중명령어 && 처리
-	char** node_token[MAX_TOKEN_SIZE];
-	int node = 0, mi_token = 0;
-	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
 
-	for (int i = 0; token[i] != NULL; i++) {
-		if (strcmp(token[i], "&&") == 0) {
-			node_token[node][mi_token] = NULL;
-			node++;
-			mi_token = 0;
-			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
-		}
-		else {
-			node_token[node][mi_token++] = token[i];
-		}
-	}
-	node_token[node][mi_token] = NULL;
+void multi2(char** line, int line_index) {  //다중명령어 && 처리
+	for (int i = 0; i < line_index; i++) {
+		int token_count = 0;
+		char** tokens = tokenize(line[i], &token_count); // 명령어 하나씩 토큰화
 
-	for (int i = 0; i <= node; i++) {
+
+
+		
 		int pid = fork();
 		if (pid == 0) {
-			execvp(node_token[i][0], node_token[i]);
-			perror("execvp fail");
-			exit(1);
-		}
+				execvp(tokens[i], tokens);
+				fprintf(stderr, "KU Shell: %s: command not found\n", tokens[0]);
+				exit(1);
+			}
 		else {
-			int status;
-			waitpid(pid, &status, 0);
-			// 앞 명령이 실패하면 다음 명령어는 실행 안 함
-			if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) //부모가 자식의 종료상태 체크
-				break;
-		}
-	}
+				int status;
+				waitpid(pid, &status, 0);
+				// 앞 명령이 실패하면 다음 명령어는 실행 안 함
+				if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) //부모가 자식의 종료상태 체크
+					break;
+			}
+		
 
-	for (int i = 0; i <= node; i++)
-		free(node_token[i]);
+		for (int j = 0; j < token_count; j++) {
+			free(tokens[j]);
+		}
+		free(tokens);
+	}
 }
 
-void multi3(char* line, char** token, int token_count) { //다중 명령어 || 처리
-	char** node_token[MAX_TOKEN_SIZE];
-	int node = 0, mi_token = 0;
-	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
+void multi3(char** line, int line_index) { //다중 명령어 || 처리
+	for (int i = 0; i < line_index; i++) {
+		int token_count = 0;
+		char** tokens = tokenize(line[i], &token_count); // 명령어 하나씩 토큰화
 
-	for (int i = 0; token[i] != NULL; i++) {
-		if (strcmp(token[i], "||") == 0) {
-			node_token[node][mi_token] = NULL;
-			node++;
-			mi_token = 0;
-			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
-		}
-		else {
-			node_token[node][mi_token++] = token[i];
-		}
-	}
-	node_token[node][mi_token] = NULL;
 
-	for (int i = 0; i <= node; i++) {
+		
 		int pid = fork();
 		if (pid == 0) {
-			execvp(node_token[i][0], node_token[i]);
-			perror("execvp fail");
-			exit(1);
-		}
+				execvp(tokens[0], tokens);
+				fprintf(stderr, "KU Shell: %s: command not found\n", tokens[0]);
+				exit(1);
+			}
 		else {
-			int status;
-			waitpid(pid, &status, 0);
-			// 앞 명령이 성공하면 다음 명령어는 실행 안 함
-			if (!WIFEXITED(status) || WEXITSTATUS(status) == 0)
-				break;
-		}
-	}
+				int status;
+				waitpid(pid, &status, 0);
+				// 앞 명령이 성공하면 다음 명령어는 실행 안 함
+				if (!WIFEXITED(status) || WEXITSTATUS(status) == 0)
+					break;
+			}
+		
 
-	for (int i = 0; i <= node; i++)
-		free(node_token[i]);
+		for (int i = 0; i <= token_count; i++) {
+			free(tokens[i]);
+		}
+		free(tokens);
+	}
 }
 
-void multi4(char* line, char** token, int token_count) {  //다중명령어 & 처리
-	char** node_token[MAX_TOKEN_SIZE];
 	
-	int node = 0;
-	int mi_token = 0;
-	node_token[0] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
-	for (int i = 0; token[i] != NULL; i++) {
-		if (strcmp(token[i], "&") == 0) {
-			node_token[node][mi_token] = NULL;
-			node++;
-			mi_token = 0;
-			node_token[node] = malloc(sizeof(char*) * MAX_TOKEN_SIZE);
-		}
-		else {
-			node_token[node][mi_token++] = token[i];
-		}
-	}
-	node_token[node][mi_token] = NULL;
-	for (int i = 0; i <= node; i++)
-	{
-		int pid = fork();
-		if (pid == 0)
-		{
-			
 
-			execvp(node_token[i][0], node_token[i]);
-			perror("excvp fail");
-			exit(1);
-		}
+void multi4(char** line, int line_index) {
+		for (int i = 0; i < line_index; i++) {
+			int token_count = 0;
+			char** tokens = tokenize(line[i], &token_count);
 
+			int pid = fork();
+			if (pid == 0) {
+				// 자식 프로세스
+				execvp(tokens[0], tokens);
+				fprintf(stderr, "KU Shell: %s: command not found\n", tokens[0]);
+				exit(1);
+			}
+			// 부모는 wait() 없이 다음 명령으로 넘어감 (백그라운드 실행)
+
+			// 메모리 해제
+			for (int j = 0; j < token_count; j++) {
+				free(tokens[j]);
+			}
+			free(tokens);
+		}
 	}
-	for (int i = 0; i <= node; i++) {
-		free(node_token[i]);
+
+char** mul_multi(char* line, const char* delim) {
+	char** result = malloc(sizeof(char*) * 64);
+	int index = 0;
+
+	char* token = strtok(line, delim);
+	while (token != NULL) {
+		result[index++] = strdup(token);
+		token = strtok(NULL, delim);
 	}
-	return;
+	result[index] = NULL; // 마지막은 NULL로
+
+	return result;
 }
 
 
@@ -312,7 +288,7 @@ void pipee(char** token, int token_count, char* line) {
 			close(pipes[0][0]);
 			close(pipes[0][1]);
 			execvp(node_token[0][0], node_token[0]);
-			perror("execvp");
+			fprintf(stderr, "KU Shell: %s: command not found\n", node_token[0][0]);
 			exit(1);
 		}
 		close(pipes[0][1]);
@@ -347,7 +323,7 @@ void pipee(char** token, int token_count, char* line) {
 				close(pipes[i][0]);
 				close(pipes[i + 1][1]);
 				execvp(node_token[i + 1][0], node_token[i + 1]);
-				perror("execvp");
+				fprintf(stderr, "KU Shell: %s: command not found\n", node_token[0][0]);
 				exit(1);
 			}
 			close(pipes[i][0]);
@@ -380,7 +356,7 @@ void pipee(char** token, int token_count, char* line) {
 			dup2(pipes[node - 1][0], STDIN_FILENO);
 			close(pipes[node - 1][0]);
 			execvp(node_token[node][0], node_token[node]);
-			perror("execvp");
+			fprintf(stderr, "KU Shell: %s: command not found\n", node_token[0][0]);
 			exit(1);
 		}
 		close(pipes[node - 1][0]);
@@ -397,29 +373,48 @@ void pipee(char** token, int token_count, char* line) {
 
 
 void execc(char* line) {
-	int token_count = 0;
+	static int token_count = 0;
 	int pipp = 0;
 	char** tokens = tokenize(line, &token_count);
 	int pid;
+	char** help_line;
 	//다중 명령어 기호 탐색
 	for (int i = 0; line[i] != '\0'; i++)
 	{
 		if (line[i] == '&' && line[i + 1] == '&') {
-			multi2(line, tokens, token_count);
+			help_line = mul_multi(line, "&&");
+			int count = 0;
+			while (help_line[count] != NULL) count++;
+
+			multi4(help_line, count);
+
+		
 			return;
 		}
 		else if (line[i] == '|' && line[i + 1] == '|') {
-			multi3(line, tokens, token_count);
+			help_line = mul_multi(line, "||");
+			int count = 0;
+			while (help_line[count] != NULL) count++;
+			
+			multi3(help_line, count);
 			return;
 		}
 		else if (line[i] == ';')
 		{
-			multi1(line, tokens, token_count);
+			help_line = mul_multi(line, ";");
+			int count = 0;
+			while (help_line[count] != NULL) count++;
+			
+			multi1(help_line, count);
 			return;
 		}
 		else if (line[i] == '&')
 		{
-			multi4(line, tokens, token_count);
+			help_line = mul_multi(line, "&");
+			int count = 0;
+			while (help_line[count] != NULL) count++;
+			
+			multi4(help_line,count);
 			
 			
 			return;
@@ -465,7 +460,8 @@ void execc(char* line) {
 			}
 			else if (pid == 0) {
 				execvp(tokens[0], tokens);
-				perror("execvp fail");
+				fprintf(stderr, "KU Shell: %s: command not found\n", tokens[0]);
+				
 				exit(1);
 			}
 			else {
@@ -480,6 +476,16 @@ void execc(char* line) {
 	free(tokens);
 
 }
+void print_banner() {
+	printf(" _  __ _    _ \n");
+	printf("| |/ /| |  | |\n");
+	printf("| ' / | |  | |\n");
+	printf("| . \\ | |__| |\n");
+	printf("|_|\\_\\ \\____/ \n");
+	printf("  K     U     \n");
+	printf("====================\n");
+	printf(" Welcome to the KU Shell!\n\n");
+}
 
 
 
@@ -490,6 +496,7 @@ int main(int argc, char* argv[])
 	
 
 	char line[MAX_INPUT_SIZE];
+	print_banner();
 
 	while (1) {
 		
