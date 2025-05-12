@@ -386,7 +386,7 @@ void execc(char* line) {
 			int count = 0;
 			while (help_line[count] != NULL) count++;
 
-			multi4(help_line, count);
+			multi2(help_line, count);
 
 		
 			return;
