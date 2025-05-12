@@ -47,7 +47,10 @@ char** tokenize(char* line , int* token_count) //입력한 문자열을 공백�
 			if (c == '\0') break;
 			}
 		else {
+			if (charindex < MAX_TOKEN_SIZE - 1) {
 				buffer[charindex++] = c;
+			}
+
 			}
 		}
 	tokens[tokenindex] = NULL;
