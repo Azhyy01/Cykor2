@@ -149,7 +149,7 @@ void multi2(char** line, int line_index) {  //다중명령어 && 처리
 		
 		int pid = fork();
 		if (pid == 0) {
-				execvp(tokens[i], tokens);
+				execvp(tokens[0], tokens);
 				fprintf(stderr, "KU Shell: %s: command not found\n", tokens[0]);
 				exit(1);
 			}
